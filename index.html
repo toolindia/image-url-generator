@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cloud Asset Pipeline</title>
+  <title>HD Asset Dispatcher</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,7 +22,6 @@
       --brand-accent: #f97316;
       --status-success: #10b981;
       --status-error: #ef4444;
-      --status-warning: #f59e0b;
       --radius-sm: 4px;
       --radius-md: 8px;
       --radius-lg: 12px;
@@ -191,7 +190,7 @@
     }
 
     .status-queued { color: var(--text-muted); }
-    .status-uploading { color: var(--brand-accent); }
+    .status-processing { color: var(--brand-accent); }
     .status-success { color: var(--status-success); }
     .status-failed { color: var(--status-error); }
 
@@ -277,7 +276,7 @@
     <header>
       <div class="header-text">
         <h1>Direct Asset Dispatcher</h1>
-        <p>Lossless Media Ingestion to Google Sheet Registry</p>
+        <p>Lossless Base64 to HD Storage Pipeline</p>
       </div>
       <div class="badge">Enterprise Ready</div>
     </header>
@@ -285,7 +284,7 @@
     <div class="dropzone" id="dropArea">
       <input type="file" id="fileSelector" multiple accept="image/*" />
       <div class="dropzone-title">Select media or drag files directly</div>
-      <div class="dropzone-caption">High-resolution images supported without automated compression</div>
+      <div class="dropzone-caption">Lossless HD resolution preserved via direct Stream</div>
     </div>
 
     <div class="progress-bar-container" id="progressWrapper">
@@ -309,12 +308,7 @@
   </div>
 
   <script>
-    // Configuration Endpoint
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXKmM8NqCRdZ2OokZqg2t5XRzV7FRZVJpY51E0Ia_6P_VSnk154BUZsapNcSeM8uvehg/exec";
-    
-    // Cloudinary Unsigned Ingest Config (Original parameters)
-    const CLOUDINARY_CLOUD_NAME = "demo"; 
-    const CLOUDINARY_PRESET = "docs_upload_example_preset"; 
 
     let stagedFiles = [];
     const fileSelector = document.getElementById("fileSelector");
@@ -408,6 +402,18 @@
       statusMessage.innerText = "Queue flushed. Ready.";
     }
 
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64String = reader.result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+      });
+    }
+
     async function processIngestionQueue() {
       if (!stagedFiles.length) return;
 
@@ -416,40 +422,39 @@
       fileSelector.disabled = true;
       progressWrapper.style.display = "block";
 
-      const compiledPayload = [];
       const total = stagedFiles.length;
+      let processed = 0;
 
       for (let i = 0; i < total; i++) {
         const item = stagedFiles[i];
-        item.status = "UPLOADING";
+        item.status = "PROCESSING";
         renderQueue();
-
-        statusMessage.innerText = `[${i + 1}/${total}] Transmitting asset: ${item.raw.name}`;
+        statusMessage.innerText = `[${i + 1}/${total}] Encoding & Dispatching ${item.raw.name}...`;
 
         try {
-          const form = new FormData();
-          form.append("file", item.raw);
-          form.append("upload_preset", CLOUDINARY_PRESET);
+          const base64Data = await readFileAsBase64(item.raw);
 
-          const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+          const payload = {
+            files: [{
+              name: item.raw.name,
+              type: item.raw.type,
+              size: item.raw.size,
+              base64: base64Data
+            }]
+          };
+
+          await fetch(APPS_SCRIPT_URL, {
             method: "POST",
-            body: form
-          });
-
-          if (!res.ok) throw new Error("Storage dispatch rejected");
-
-          const responseData = await res.json();
-
-          compiledPayload.push({
-            name: item.raw.name,
-            url: responseData.secure_url,
-            size: item.raw.size
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
           });
 
           item.status = "SUCCESS";
+          processed++;
         } catch (err) {
           item.status = "FAILED";
-          statusMessage.innerText = `Error on asset ${item.raw.name}: ${err.message}`;
+          statusMessage.innerText = `Dispatch failed for ${item.raw.name}: ${err.message}`;
         }
 
         const pct = Math.round(((i + 1) / total) * 100);
@@ -457,25 +462,7 @@
         renderQueue();
       }
 
-      if (compiledPayload.length > 0) {
-        statusMessage.innerText = "Synchronizing metadata with Google Sheets registry...";
-        
-        try {
-          await fetch(APPS_SCRIPT_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ files: compiledPayload })
-          });
-
-          statusMessage.innerText = `Dispatch complete. ${compiledPayload.length} records verified and stored in sheet.`;
-        } catch (syncErr) {
-          statusMessage.innerText = `Spreadsheet synchronization error: ${syncErr.message}`;
-        }
-      } else {
-        statusMessage.innerText = "Process terminated: No assets qualified for registry sync.";
-      }
-
+      statusMessage.innerText = `Pipeline complete. ${processed} of ${total} files saved directly to Drive & Sheet.`;
       fileSelector.disabled = false;
       clearBtn.disabled = false;
     }
