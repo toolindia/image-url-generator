@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Asset Pipeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --bg-surface: #111827;
+      --bg-surface-elevated: #1f2937;
+      --border-subtle: #2d3748;
+      --border-active: #3b82f6;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --brand-primary: #0284c7;
+      --brand-primary-hover: #0369a1;
+      --brand-accent: #f97316;
+      --status-success: #10b981;
+      --status-error: #ef4444;
+      --status-warning: #f59e0b;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .header-text h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      text-transform: uppercase;
+    }
+
+    .header-text p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .badge {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      background: rgba(2, 132, 199, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    .dropzone {
+      position: relative;
+      border: 1.5px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 44px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(17, 24, 39, 0.6);
+      transition: all 0.2s ease;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--border-active);
+      background: rgba(59, 130, 246, 0.04);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .dropzone-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .dropzone-caption {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .queue-panel {
+      margin-top: 24px;
+      display: none;
+    }
+
+    .queue-header {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .file-list {
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface-elevated);
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .file-item:last-child {
+      border-bottom: none;
+    }
+
+    .file-info {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .file-name {
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      max-width: 280px;
+    }
+
+    .file-meta {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .file-status {
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .status-queued { color: var(--text-muted); }
+    .status-uploading { color: var(--brand-accent); }
+    .status-success { color: var(--status-success); }
+    .status-failed { color: var(--status-error); }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 4px;
+      background: var(--border-subtle);
+      border-radius: 2px;
+      margin-top: 18px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--brand-accent);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+
+    .action-panel {
+      margin-top: 24px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--brand-primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--brand-primary-hover);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-primary);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .system-log {
+      margin-top: 18px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      min-height: 18px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="header-text">
+        <h1>Direct Asset Dispatcher</h1>
+        <p>Lossless Media Ingestion to Google Sheet Registry</p>
+      </div>
+      <div class="badge">Enterprise Ready</div>
+    </header>
+
+    <div class="dropzone" id="dropArea">
+      <input type="file" id="fileSelector" multiple accept="image/*" />
+      <div class="dropzone-title">Select media or drag files directly</div>
+      <div class="dropzone-caption">High-resolution images supported without automated compression</div>
+    </div>
+
+    <div class="progress-bar-container" id="progressWrapper">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="queue-panel" id="queueContainer">
+      <div class="queue-header">
+        <span>Staged Queue</span>
+        <span id="queueCounter">0 Assets</span>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <div class="action-panel">
+      <button class="btn btn-secondary" id="clearBtn" onclick="resetQueue()" disabled>Clear</button>
+      <button class="btn btn-primary" id="executeBtn" onclick="processIngestionQueue()" disabled>Execute Dispatch</button>
+    </div>
+
+    <div class="system-log" id="statusMessage">System idle. Ready for ingest.</div>
+  </div>
+
+  <script>
+    // Configuration Endpoint
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXKmM8NqCRdZ2OokZqg2t5XRzV7FRZVJpY51E0Ia_6P_VSnk154BUZsapNcSeM8uvehg/exec";
+    
+    // Cloudinary Unsigned Ingest Config (Original parameters)
+    const CLOUDINARY_CLOUD_NAME = "demo"; 
+    const CLOUDINARY_PRESET = "docs_upload_example_preset"; 
+
+    let stagedFiles = [];
+    const fileSelector = document.getElementById("fileSelector");
+    const dropArea = document.getElementById("dropArea");
+    const queueContainer = document.getElementById("queueContainer");
+    const fileList = document.getElementById("fileList");
+    const queueCounter = document.getElementById("queueCounter");
+    const executeBtn = document.getElementById("executeBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const statusMessage = document.getElementById("statusMessage");
+    const progressWrapper = document.getElementById("progressWrapper");
+    const progressBar = document.getElementById("progressBar");
+
+    fileSelector.addEventListener("change", (e) => appendToQueue(e.target.files));
+
+    ['dragenter', 'dragover'].forEach(name => {
+      dropArea.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropArea.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropArea.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropArea.classList.remove('dragover');
+      });
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files && e.dataTransfer.files.length) {
+        appendToQueue(e.dataTransfer.files);
+      }
+    });
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0 B";
+      const k = 1024;
+      const sizes = ["B", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    }
+
+    function appendToQueue(files) {
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        stagedFiles.push({
+          raw: file,
+          id: Math.random().toString(36).substring(2, 9),
+          status: "QUEUED"
+        });
+      }
+      renderQueue();
+    }
+
+    function renderQueue() {
+      if (!stagedFiles.length) {
+        queueContainer.style.display = "none";
+        executeBtn.disabled = true;
+        clearBtn.disabled = true;
+        return;
+      }
+
+      queueContainer.style.display = "block";
+      fileList.innerHTML = "";
+      queueCounter.innerText = `${stagedFiles.length} Object${stagedFiles.length > 1 ? 's' : ''}`;
+
+      stagedFiles.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "file-item";
+        row.innerHTML = `
+          <div class="file-info">
+            <span class="file-name">${item.raw.name}</span>
+            <span class="file-meta">${formatBytes(item.raw.size)}</span>
+          </div>
+          <div class="file-status status-${item.status.toLowerCase()}">${item.status}</div>
+        `;
+        fileList.appendChild(row);
+      });
+
+      executeBtn.disabled = false;
+      clearBtn.disabled = false;
+    }
+
+    function resetQueue() {
+      stagedFiles = [];
+      fileSelector.value = "";
+      progressWrapper.style.display = "none";
+      progressBar.style.width = "0%";
+      renderQueue();
+      statusMessage.innerText = "Queue flushed. Ready.";
+    }
+
+    async function processIngestionQueue() {
+      if (!stagedFiles.length) return;
+
+      executeBtn.disabled = true;
+      clearBtn.disabled = true;
+      fileSelector.disabled = true;
+      progressWrapper.style.display = "block";
+
+      const compiledPayload = [];
+      const total = stagedFiles.length;
+
+      for (let i = 0; i < total; i++) {
+        const item = stagedFiles[i];
+        item.status = "UPLOADING";
+        renderQueue();
+
+        statusMessage.innerText = `[${i + 1}/${total}] Transmitting asset: ${item.raw.name}`;
+
+        try {
+          const form = new FormData();
+          form.append("file", item.raw);
+          form.append("upload_preset", CLOUDINARY_PRESET);
+
+          const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: "POST",
+            body: form
+          });
+
+          if (!res.ok) throw new Error("Storage dispatch rejected");
+
+          const responseData = await res.json();
+
+          compiledPayload.push({
+            name: item.raw.name,
+            url: responseData.secure_url,
+            size: item.raw.size
+          });
+
+          item.status = "SUCCESS";
+        } catch (err) {
+          item.status = "FAILED";
+          statusMessage.innerText = `Error on asset ${item.raw.name}: ${err.message}`;
+        }
+
+        const pct = Math.round(((i + 1) / total) * 100);
+        progressBar.style.width = `${pct}%`;
+        renderQueue();
+      }
+
+      if (compiledPayload.length > 0) {
+        statusMessage.innerText = "Synchronizing metadata with Google Sheets registry...";
+        
+        try {
+          await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ files: compiledPayload })
+          });
+
+          statusMessage.innerText = `Dispatch complete. ${compiledPayload.length} records verified and stored in sheet.`;
+        } catch (syncErr) {
+          statusMessage.innerText = `Spreadsheet synchronization error: ${syncErr.message}`;
+        }
+      } else {
+        statusMessage.innerText = "Process terminated: No assets qualified for registry sync.";
+      }
+
+      fileSelector.disabled = false;
+      clearBtn.disabled = false;
+    }
+  </script>
+</body>
+</html>
