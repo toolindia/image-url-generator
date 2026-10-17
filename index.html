@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HD Asset Dispatcher</title>
+  <title>Direct Asset Pipeline</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -143,7 +143,7 @@
     }
 
     .file-list {
-      max-height: 220px;
+      max-height: 260px;
       overflow-y: auto;
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
@@ -152,15 +152,21 @@
 
     .file-item {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 14px;
       font-size: 12px;
       border-bottom: 1px solid var(--border-subtle);
     }
 
     .file-item:last-child {
       border-bottom: none;
+    }
+
+    .file-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .file-info {
@@ -193,6 +199,42 @@
     .status-processing { color: var(--brand-accent); }
     .status-success { color: var(--status-success); }
     .status-failed { color: var(--status-error); }
+
+    .url-output {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .url-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #38bdf8;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      outline: none;
+    }
+
+    .copy-btn {
+      background: var(--border-subtle);
+      color: var(--text-primary);
+      border: none;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      background: var(--brand-primary);
+    }
 
     .progress-bar-container {
       width: 100%;
@@ -284,7 +326,7 @@
     <div class="dropzone" id="dropArea">
       <input type="file" id="fileSelector" multiple accept="image/*" />
       <div class="dropzone-title">Select media or drag files directly</div>
-      <div class="dropzone-caption">Lossless HD resolution preserved via direct Stream</div>
+      <div class="dropzone-caption">Lossless HD resolution preserved</div>
     </div>
 
     <div class="progress-bar-container" id="progressWrapper">
@@ -358,7 +400,8 @@
         stagedFiles.push({
           raw: file,
           id: Math.random().toString(36).substring(2, 9),
-          status: "QUEUED"
+          status: "QUEUED",
+          url: null
         });
       }
       renderQueue();
@@ -379,18 +422,44 @@
       stagedFiles.forEach(item => {
         const row = document.createElement("div");
         row.className = "file-item";
+
+        let urlBlock = "";
+        if (item.url) {
+          urlBlock = `
+            <div class="url-output">
+              <input type="text" class="url-input" readonly value="${item.url}" id="url_${item.id}" />
+              <button class="copy-btn" onclick="copyUrl('${item.id}', this)">Copy</button>
+            </div>
+          `;
+        }
+
         row.innerHTML = `
-          <div class="file-info">
-            <span class="file-name">${item.raw.name}</span>
-            <span class="file-meta">${formatBytes(item.raw.size)}</span>
+          <div class="file-item-row">
+            <div class="file-info">
+              <span class="file-name">${item.raw.name}</span>
+              <span class="file-meta">${formatBytes(item.raw.size)}</span>
+            </div>
+            <div class="file-status status-${item.status.toLowerCase()}">${item.status}</div>
           </div>
-          <div class="file-status status-${item.status.toLowerCase()}">${item.status}</div>
+          ${urlBlock}
         `;
         fileList.appendChild(row);
       });
 
       executeBtn.disabled = false;
       clearBtn.disabled = false;
+    }
+
+    function copyUrl(id, btn) {
+      const input = document.getElementById(`url_${id}`);
+      input.select();
+      navigator.clipboard.writeText(input.value);
+      btn.innerText = "Copied!";
+      btn.style.background = "#10b981";
+      setTimeout(() => {
+        btn.innerText = "Copy";
+        btn.style.background = "";
+      }, 1800);
     }
 
     function resetQueue() {
@@ -427,9 +496,11 @@
 
       for (let i = 0; i < total; i++) {
         const item = stagedFiles[i];
+        if (item.status === "SUCCESS") continue;
+
         item.status = "PROCESSING";
         renderQueue();
-        statusMessage.innerText = `[${i + 1}/${total}] Encoding & Dispatching ${item.raw.name}...`;
+        statusMessage.innerText = `[${i + 1}/${total}] Transmitting ${item.raw.name}...`;
 
         try {
           const base64Data = await readFileAsBase64(item.raw);
@@ -443,6 +514,7 @@
             }]
           };
 
+          // Post to Google Apps Script
           await fetch(APPS_SCRIPT_URL, {
             method: "POST",
             mode: "no-cors",
@@ -451,10 +523,12 @@
           });
 
           item.status = "SUCCESS";
+          // Google Sheet check status update
+          item.url = "Saved to Sheet (Check Column C)";
           processed++;
         } catch (err) {
           item.status = "FAILED";
-          statusMessage.innerText = `Dispatch failed for ${item.raw.name}: ${err.message}`;
+          statusMessage.innerText = `Dispatch failed: ${err.message}`;
         }
 
         const pct = Math.round(((i + 1) / total) * 100);
@@ -462,7 +536,7 @@
         renderQueue();
       }
 
-      statusMessage.innerText = `Pipeline complete. ${processed} of ${total} files saved directly to Drive & Sheet.`;
+      statusMessage.innerText = `Complete: ${processed} of ${total} files saved to your Google Sheet!`;
       fileSelector.disabled = false;
       clearBtn.disabled = false;
     }
